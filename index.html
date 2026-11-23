@@ -165,7 +165,7 @@ async function runSportsAnalysis(){
  $('aiH2H').textContent='Recherche des confrontations directes…';
  let history;
  try{
-  const params=new URLSearchParams({sport:sportCode,league:leagueId,home:String(homeId),away:String(awayId),limit});
+  const params=new URLSearchParams({sport:sportCode,league:leagueId,home:String(homeId),away:String(awayId),limit,...(selected.date?{targetDate:selected.date}:{})});
   const response=await fetch('/api/history?'+params.toString());
   history=await response.json();
   if(!response.ok)throw new Error(history.detail||history.error||('HTTP '+response.status));

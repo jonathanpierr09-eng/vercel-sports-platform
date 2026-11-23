@@ -7,7 +7,8 @@
     "dev": "vercel dev",
     "backfill": "node scripts/backfill.mjs",
     "validate:history": "node scripts/validate-history.mjs",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "node --test"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.45.4"

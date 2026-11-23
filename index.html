@@ -38,7 +38,8 @@ body{padding-bottom:88px}.wrap{padding-bottom:24px}.quick-actions{margin-top:4px
 </section><footer class="foot">PRONO fournit des informations et des analyses sportives. Les données dépendent des flux ESPN et les statistiques absentes ne sont pas estimées arbitrairement.</footer></section><nav class="bottom-nav" aria-label="Navigation principale"><button class="nav-item active" data-nav="home"><span class="nav-icon">⌂</span>Accueil</button><button class="nav-item" data-nav="matches"><span class="nav-icon">◉</span>Matchs</button><button class="nav-item" data-nav="direct"><span class="nav-icon">◉</span>Direct</button><button class="nav-item" data-nav="ai"><span class="nav-icon">✦</span>PRONO IA</button><button class="nav-item" data-nav="competitions"><span class="nav-icon">♜</span>Compétitions</button><button class="nav-item" data-nav="plus"><span class="nav-icon">•••</span>Plus</button></nav>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
+<script type="module">
+import { analyzeMatchHistory } from './lib/match-engine.js';
 const SUPABASE_URL='https://rvjfjlxwkakgmuvdfjpi.supabase.co';
 const SUPABASE_KEY='sb_publishable_DCmA2L3fdx32gjq_EHEsyg_JbnCRmgH';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
@@ -202,6 +203,9 @@ async function runSportsAnalysis(){
  $('aiRecent').innerHTML='<div class="ai-grid"><div><b>'+safe(h?.team?.displayName||'Équipe domicile')+'</b>'+recentTeamRows(homeData?.recent,h?.team?.displayName||'Équipe domicile',unit)+'</div><div><b>'+safe(a?.team?.displayName||'Équipe extérieure')+'</b>'+recentTeamRows(awayData?.recent,a?.team?.displayName||'Équipe extérieure',unit)+'</div></div>';
  $('aiH2H').innerHTML='<b>'+((h2h?.count||0)+' confrontation(s) retrouvée(s)')+'</b>'+historyRows(h2h?.matches);
  $('aiNarrative').textContent=buildAnalysisSummary({team:h?.team,stats:homeData?.stats},{team:a?.team,stats:awayData?.stats},h2h,sportCode);
+ const engineReport=analyzeMatchHistory({home:homeData||{},away:awayData||{},headToHead:h2h||{}});
+ $('aiNarrative').style.whiteSpace='pre-line';
+ $('aiNarrative').textContent+='\\n\\n'+engineReport.text;
  const usedHome=homeData?.stats?.matches||0,usedAway=awayData?.stats?.matches||0;
  $('aiDataQuality').innerHTML='Source : ESPN · Actualisé : '+safe(history.fetchedAt?new Date(history.fetchedAt).toLocaleString('fr-FR'):'date non fournie')+'<br>Échantillon : '+usedHome+' match(s) pour '+safe(h?.team?.displayName||'l’équipe domicile')+' et '+usedAway+' pour '+safe(a?.team?.displayName||'l’équipe extérieure')+'.<br>Confrontations directes retrouvées : '+(h2h?.count||0)+'.<br><span class="muted">La couverture dépend des archives ESPN. Une donnée absente n’est pas estimée. Les statistiques décrivent le passé et ne prédisent pas le résultat futur.</span>';
  $('aiStatus').textContent='Historique mis à jour · source ESPN · '+(q.remaining??'—')+' analyse(s) restante(s) aujourd’hui.';

@@ -205,7 +205,8 @@ async function runSportsAnalysis(){
  const engineReport=analyzeMatchHistory({
   home:{...homeData,name:homeName},
   away:{...awayData,name:awayName},
-  headToHead:h2h||{}
+  headToHead:h2h||{},
+  unit:sportCode==='basketball'?'point(s)':sportCode==='hockey'?'but(s)':'but(s)'
  });
  $('aiNarrative').style.whiteSpace='pre-line';
  $('aiNarrative').textContent=engineReport.text;

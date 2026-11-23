@@ -16,7 +16,7 @@ test("produces deterministic historical report", () => {
   assert.equal(first.text, second.text);
   assert.equal(first.home.stats.matches, 3);
   assert.match(first.text, /Scores exacts les plus fréquents dans les archives/);
-  assert.match(first.text, /pas une projection/);
+  assert.match(first.text, /PAS DES SCORES PRÉVUS/);
 });
 
 test("ignores malformed score rows and marks low coverage", () => {
@@ -36,4 +36,25 @@ test("score frequency is counted from historical rows only", () => {
     away: { recent: [] }
   });
   assert.deepEqual(report.home.historicalScores[0], { score: "2-1", count: 2 });
+});
+
+
+test("uses team names and explains limited samples without future forecasts", () => {
+  const report = analyzeMatchHistory({
+    home: { name: "Monza", recent: [row(1, 2, "L")] },
+    away: { name: "Fiorentina", recent: [row(2, 2, "D", "away")] },
+    headToHead: { matches: [] }
+  });
+  assert.match(report.text, /Monza/);
+  assert.match(report.text, /Fiorentina/);
+  assert.match(report.text, /Échantillon limité/);
+  assert.match(report.text, /Aucun tirage aléatoire/);
+});
+
+test("does not count negative or missing scores", () => {
+  const report = analyzeMatchHistory({
+    home: { recent: [row(-1, 0, "L"), row(2, 0, "W")] },
+    away: { recent: [] }
+  });
+  assert.equal(report.home.stats.matches, 1);
 });

@@ -22,7 +22,8 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=id=>document.getElementById(id);let sport='soccer',events=[],selected=null,loginMode='client',profile=null;
 const configs={soccer:[['eng.1','Premier League'],['esp.1','La Liga'],['ger.1','Bundesliga'],['ita.1','Serie A'],['fra.1','Ligue 1'],['uefa.champions','Ligue des Champions']],basketball:[['nba','NBA']],hockey:[['nhl','NHL']]};
 const today=()=>{let d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-$('date').value=today();$('dateLabel').textContent='Affichage journalier';\nfunction localDateValue(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}\nfunction updateDayLabel(){const d=new Date($('date').value+'T12:00:00');$('dayLabel').textContent=d.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});$('dateLabel').textContent='Journée du '+d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}\nfunction shiftDay(n){const d=new Date($('date').value+'T12:00:00');d.setDate(d.getDate()+n);$('date').value=localDateValue(d);updateDayLabel();load()}
+$('date').value=today();$('dateLabel').textContent='Affichage journalier';
+function localDateValue(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}\nfunction updateDayLabel(){const d=new Date($('date').value+'T12:00:00');$('dayLabel').textContent=d.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});$('dateLabel').textContent='Journée du '+d.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}\nfunction shiftDay(n){const d=new Date($('date').value+'T12:00:00');d.setDate(d.getDate()+n);$('date').value=localDateValue(d);updateDayLabel();load()}
 function fillLeagues(){const opts=configs[sport];$('league').innerHTML='<option value="">Toutes compétitions</option>'+opts.map(x=>'<option value="'+x[0]+'">'+x[1]+'</option>').join('')}
 function fmtDate(d){return d.toISOString().slice(0,10).replaceAll('-','')}
 function safe(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -32,7 +33,48 @@ function render(){let arr=events.slice().sort((a,b)=>new Date(a.date)-new Date(b
 $('matches').innerHTML=arr.map((e,i)=>{let c=e.competitions?.[0],h=c?.competitors?.find(x=>x.homeAway==='home'),a=c?.competitors?.find(x=>x.homeAway==='away'),pre=c?.status?.type?.state==='pre';return '<article class="match"><div class="league"><span>'+safe(e.leagueName)+'</span><span>'+safe(status(e))+'</span></div><div class="teams"><div class="team">'+safe(h?.team?.displayName||'Domicile')+'</div><div class="score">'+(pre?'VS':safe(h?.score??'—')+' – '+safe(a?.score??'—'))+'</div><div class="team">'+safe(a?.team?.displayName||'Extérieur')+'</div></div><div class="matchfoot"><span>'+safe(e.shortName||'Rencontre')+'</span><button class="analyze" data-index="'+i+'">Voir l’analyse ↗</button></div></article>'}).join('');
 document.querySelectorAll('[data-index]').forEach(b=>b.onclick=()=>selectMatch(arr[+b.dataset.index]));}
 function selectMatch(e,scroll=true){selected=e;let c=e.competitions?.[0],h=c?.competitors?.find(x=>x.homeAway==='home'),a=c?.competitors?.find(x=>x.homeAway==='away');$('aMatch').textContent=(h?.team?.displayName||'—')+' – '+(a?.team?.displayName||'—');$('aState').textContent='Calendrier reçu';$('homeRecord').textContent=record(h?.team);$('awayRecord').textContent=record(a?.team);$('analysisIntro').textContent='Bilan de saison transmis par ESPN lorsqu’il est disponible. Les tendances non fournies restent indiquées comme indisponibles.';if(scroll)$('analysis').scrollIntoView({behavior:'smooth',block:'center'});}
-async function load(keepSelection=false){updateDayLabel();if(!keepSelection){selected=null;$('aMatch').textContent='—';$('aState').textContent='En attente';$('homeRecord').textContent='—';$('awayRecord').textContent='—';}$('matches').innerHTML='<div class="empty">Récupération des rencontres de cette journée…</div>';let day=$('date').value.replaceAll('-','');let days=[day];let comps=$('league').value?configs[sport].filter(x=>x[0]===$('league').value):configs[sport];try{let requests=comps.flatMap(x=>days.map(async day=>{let path=sport+'/'+x[0]+'/scoreboard?dates='+day;let r=await fetch('/api/espn?path='+encodeURIComponent(path));if(!r.ok)throw Error('ESPN '+r.status+' ('+x[1]+', '+day+')');let j=await r.json();return (j.events||[]).map(e=>({...e,leagueName:x[1]}))}));let results=await Promise.all(requests);events=Array.from(new Map(results.flat().map(e=>[e.id,e])).values());render();if(keepSelection&&selected){const fresh=events.find(x=>x.id===selected.id);if(fresh)selectMatch(fresh,false);else{selected=null;$('aMatch').textContent='—';$('aState').textContent='En attente';$('homeRecord').textContent='—';$('awayRecord').textContent='—';}}}catch(e){events=[];$('count').textContent='0';$('matches').innerHTML='<div class="empty">Le flux ESPN ne répond pas ('+safe(e.message)+'). Réessaie dans quelques instants.</div>';$('updated').textContent='Flux indisponible'}}
+let loadRequestId=0;
+async function load(keepSelection=false){
+ const requestId=++loadRequestId;
+ updateDayLabel();
+ if(!keepSelection){selected=null;$('aMatch').textContent='—';$('aState').textContent='En attente';$('homeRecord').textContent='—';$('awayRecord').textContent='—';}
+ events=[];$('count').textContent='0';
+ $('matches').innerHTML='<div class="empty">Chargement des rencontres…</div>';
+ $('updated').textContent='Connexion aux compétitions…';
+ const day=$('date').value.replaceAll('-','');
+ const comps=$('league').value?configs[sport].filter(x=>x[0]===$('league').value):configs[sport];
+ const collected=new Map();let completed=0,failed=0;
+ const paint=()=>{
+  if(requestId!==loadRequestId)return;
+  events=Array.from(collected.values()).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  render();
+  $('updated').textContent=completed+'/'+comps.length+' compétitions chargées'+(failed?' · '+failed+' indisponible(s)':'');
+ };
+ await Promise.all(comps.map(async x=>{
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),9000);
+  try{
+   const path=sport+'/'+x[0]+'/scoreboard?dates='+day;
+   const r=await fetch('/api/espn?path='+encodeURIComponent(path),{signal:controller.signal});
+   if(!r.ok)throw Error('HTTP '+r.status);
+   const j=await r.json();
+   if(requestId!==loadRequestId)return;
+   (j.events||[]).forEach(e=>collected.set(e.id,{...e,leagueName:x[1]}));
+  }catch(err){if(requestId===loadRequestId){failed++;console.warn('PRONO '+x[1]+':',err.message)}}
+  finally{clearTimeout(timer);if(requestId===loadRequestId){completed++;paint()}}
+ }));
+ if(requestId!==loadRequestId)return;
+ if(!events.length&&failed){
+  $('matches').innerHTML='<div class="empty">Les compétitions ne répondent pas pour le moment. Tu peux réessayer sans changer la date.</div>';
+  $('updated').textContent='Flux temporairement indisponible';
+ }else if(failed){
+  $('updated').textContent=completed+'/'+comps.length+' compétitions · '+failed+' erreur(s)';
+ }
+ if(keepSelection&&selected){
+  const fresh=events.find(x=>x.id===selected.id);
+  if(fresh)selectMatch(fresh,false);
+  else{selected=null;$('aMatch').textContent='—';$('aState').textContent='En attente';$('homeRecord').textContent='—';$('awayRecord').textContent='—';}
+ }
+}
 document.querySelectorAll('[data-sport]').forEach(b=>b.onclick=()=>{sport=b.dataset.sport;document.querySelectorAll('[data-sport]').forEach(x=>x.classList.toggle('active',x===b));fillLeagues();load()});$('refresh').onclick=load;$('date').onchange=()=>{updateDayLabel();load()};$('league').onchange=load;$('prevDay').onclick=()=>shiftDay(-1);$('nextDay').onclick=()=>shiftDay(1);$('todayBtn').onclick=()=>{$('date').value=today();updateDayLabel();load()};fillLeagues();updateDayLabel();load();
 let liveRefreshTimer=setInterval(()=>{if(!document.hidden)load(true)},20000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)load(true)});

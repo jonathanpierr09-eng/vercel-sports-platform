@@ -110,16 +110,16 @@ function summarizeRecent(stats,label,unit,isSoccer){
 function formatHistoryDate(value){if(!value)return 'Date inconnue';const d=new Date(value);return Number.isNaN(d.getTime())?'Date inconnue':d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric'});}
 function recentTeamRows(matches,teamName,unit){if(!matches?.length)return '<p class="muted">Aucun match terminé retrouvé.</p>';return '<div style="display:grid;gap:7px;margin-top:8px">'+matches.map(m=>'<div class="stat"><small>'+safe(formatHistoryDate(m.date))+' · '+safe(m.homeAway==='home'?'Domicile':m.homeAway==='away'?'Extérieur':'Lieu non précisé')+'</small><b>'+safe(teamName)+' '+m.goalsFor+'–'+m.goalsAgainst+' '+safe(m.opponent)+'</b><small class="muted">'+safe(({W:'Victoire',D:'Match nul',L:'Défaite'})[m.result]||'Résultat indisponible')+' · '+safe(unit)+'</small></div>').join('')+'</div>';}
 function historyRows(matches){if(!matches?.length)return '<p class="muted">Aucune confrontation directe retrouvée dans les historiques disponibles. Cela ne signifie pas qu’il n’y en a jamais eu.</p>';return '<div style="display:grid;gap:8px;margin-top:10px">'+matches.map(m=>'<div class="stat"><small>'+safe(formatHistoryDate(m.date))+' · '+safe(m.homeAway==='home'?'Domicile':m.homeAway==='away'?'Extérieur':'Lieu non précisé')+'</small><b>'+safe(m.opponent)+' · '+m.goalsFor+'–'+m.goalsAgainst+'</b><small class="muted">'+safe(({W:'Victoire de l’équipe étudiée',D:'Match nul',L:'Défaite de l’équipe étudiée'})[m.result]||'Résultat indisponible')+'</small></div>').join('')+'</div>';}
-function buildAnalysisSummary(home,away,h2h){
- const parts=[];
+function buildAnalysisSummary(home,away,h2h,sportCode){
+ const parts=[],unit=sportCode==='basketball'?'point(s)':'but(s)';
  for(const [label,team] of [[home?.team?.displayName||'Équipe domicile',home],[away?.team?.displayName||'Équipe extérieure',away]]){
   const st=team?.stats;
-  if(st?.matches)parts.push(label+' : '+st.wins+' victoire(s), '+st.draws+' nul(s), '+st.losses+' défaite(s) sur '+st.matches+' match(s), avec '+st.goalsFor+' but(s) marqué(s) et '+st.goalsAgainst+' encaissé(s).');
+  if(st?.matches)parts.push(label+' : '+st.wins+' victoire(s), '+st.draws+' nul(s), '+st.losses+' défaite(s) sur '+st.matches+' match(s), avec '+st.goalsFor+' '+unit+' marqué(s) et '+st.goalsAgainst+' encaissé(s). Moyenne : '+st.averageGoalsFor+' pour et '+st.averageGoalsAgainst+' contre par match.');
   else parts.push(label+' : aucun résultat terminé exploitable dans la période retournée par ESPN.');
  }
- if(h2h?.count)parts.push('Confrontations directes : '+h2h.count+' rencontre(s) retrouvée(s) dans les calendriers historiques des deux équipes.');
- else parts.push('Aucune confrontation directe commune n’a été retrouvée dans les historiques reçus.');
- parts.push('Ces indicateurs décrivent les résultats passés. Ils ne prédisent pas le résultat du prochain match.');
+ if(h2h?.count)parts.push('Confrontations directes : '+h2h.count+' rencontre(s) retrouvée(s) dans les calendriers historiques consultés.');
+ else parts.push('Aucune confrontation directe commune n’a été retrouvée dans les historiques reçus ; les archives consultées peuvent être incomplètes.');
+ parts.push('Ces indicateurs décrivent uniquement les résultats passés. Ils ne prédisent pas le résultat du prochain match.');
  return parts.join(' ');
 }
 async function runSportsAnalysis(){
@@ -155,7 +155,7 @@ async function runSportsAnalysis(){
  $('aiResults').innerHTML=summarizeRecent(homeData?.stats,h?.team?.displayName||'Équipe domicile',unit,isSoccer)+summarizeRecent(awayData?.stats,a?.team?.displayName||'Équipe extérieure',unit,isSoccer);
  $('aiRecent').innerHTML='<div class="ai-grid"><div><b>'+safe(h?.team?.displayName||'Équipe domicile')+'</b>'+recentTeamRows(homeData?.recent,h?.team?.displayName||'Équipe domicile',unit)+'</div><div><b>'+safe(a?.team?.displayName||'Équipe extérieure')+'</b>'+recentTeamRows(awayData?.recent,a?.team?.displayName||'Équipe extérieure',unit)+'</div></div>';
  $('aiH2H').innerHTML='<b>'+((h2h?.count||0)+' confrontation(s) retrouvée(s)')+'</b>'+historyRows(h2h?.matches);
- $('aiNarrative').textContent=buildAnalysisSummary({team:h?.team,stats:homeData?.stats},{team:a?.team,stats:awayData?.stats},h2h);
+ $('aiNarrative').textContent=buildAnalysisSummary({team:h?.team,stats:homeData?.stats},{team:a?.team,stats:awayData?.stats},h2h,sportCode);
  const usedHome=homeData?.stats?.matches||0,usedAway=awayData?.stats?.matches||0;
  $('aiDataQuality').innerHTML='Source : ESPN · Actualisé : '+safe(history.fetchedAt?new Date(history.fetchedAt).toLocaleString('fr-FR'):'date non fournie')+'<br>Échantillon : '+usedHome+' match(s) pour '+safe(h?.team?.displayName||'l’équipe domicile')+' et '+usedAway+' pour '+safe(a?.team?.displayName||'l’équipe extérieure')+'.<br>Confrontations directes retrouvées : '+(h2h?.count||0)+'.<br><span class="muted">La couverture dépend des archives ESPN. Une donnée absente n’est pas estimée. Les statistiques décrivent le passé et ne prédisent pas le résultat futur.</span>';
  $('aiStatus').textContent='Historique mis à jour · source ESPN · '+(q.remaining??'—')+' analyse(s) restante(s) aujourd’hui.';

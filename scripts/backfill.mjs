@@ -18,10 +18,28 @@ const LEAGUES = [
   { id: "fra.1", name: "Ligue 1" }
 ];
 const SEASONS = [
-  { year: "2023", dates: "20230801-20240531" },
-  { year: "2024", dates: "20240801-20250531" },
-  { year: "2025", dates: "20250801-20260531" }
+  { year: "2023", start: "20230801", end: "20240531" },
+  { year: "2024", start: "20240801", end: "20250531" },
+  { year: "2025", start: "20250801", end: "20260531" }
 ];
+
+function monthlyDateRanges(start, end) {
+  const ranges = [];
+  const cursor = new Date(Date.UTC(Number(start.slice(0, 4)), Number(start.slice(4, 6)) - 1, 1));
+  const last = new Date(Date.UTC(Number(end.slice(0, 4)), Number(end.slice(4, 6)) - 1, 1));
+  while (cursor <= last) {
+    const year = cursor.getUTCFullYear();
+    const month = cursor.getUTCMonth();
+    const monthStart = new Date(Date.UTC(year, month, 1));
+    const monthEnd = new Date(Date.UTC(year, month + 1, 0));
+    const fmt = date => `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(date.getUTCDate()).padStart(2, "0")}`;
+    const from = fmt(monthStart) < start ? start : fmt(monthStart);
+    const to = fmt(monthEnd) > end ? end : fmt(monthEnd);
+    ranges.push(`${from}-${to}`);
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  return ranges;
+}
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function espnJson(path) {
@@ -85,38 +103,43 @@ async function upsertInChunks(table, rows, onConflict, chunkSize = 250) {
 let total = 0;
 for (const league of LEAGUES) {
   for (const season of SEASONS) {
-    const path = `${SPORT}/${league.id}/scoreboard?dates=${season.dates}&limit=200`;
-    console.log(`Fetching ${league.name} ${season.year}...`);
-    const data = await espnJson(path);
-    const events = Array.isArray(data.events) ? data.events : [];
-    const matches = events
-      .filter(completedEvent)
-      .map(event => normalizeEvent(event, league, season.year))
-      .filter(Boolean);
+    console.log(`Fetching ${league.name} ${season.year} in monthly chunks...`);
+    let seasonEvents = 0;
+    let seasonMatches = 0;
+    for (const dates of monthlyDateRanges(season.start, season.end)) {
+      const path = `${SPORT}/${league.id}/scoreboard?dates=${dates}&limit=200`;
+      const data = await espnJson(path);
+      const events = Array.isArray(data.events) ? data.events : [];
+      seasonEvents += events.length;
+      const matches = events
+        .filter(completedEvent)
+        .map(event => normalizeEvent(event, league, season.year))
+        .filter(Boolean);
 
-    const teamsById = new Map();
-    for (const event of events) {
-      for (const competitor of event?.competitions?.[0]?.competitors || []) {
-        const id = Number(competitor?.team?.id);
-        const name = competitor?.team?.displayName || competitor?.team?.name;
-        if (Number.isSafeInteger(id) && name) {
-          teamsById.set(id, {
-            sport: SPORT,
-            id,
-            league: league.id,
-            name: String(name),
-            updated_at: new Date().toISOString()
-          });
+      const teamsById = new Map();
+      for (const event of events) {
+        for (const competitor of event?.competitions?.[0]?.competitors || []) {
+          const id = Number(competitor?.team?.id);
+          const name = competitor?.team?.displayName || competitor?.team?.name;
+          if (Number.isSafeInteger(id) && name) {
+            teamsById.set(id, {
+              sport: SPORT,
+              id,
+              league: league.id,
+              name: String(name),
+              updated_at: new Date().toISOString()
+            });
+          }
         }
       }
-    }
 
-    const teams = [...teamsById.values()];
-    await upsertInChunks("teams", teams, "sport,id");
-    await upsertInChunks("matches", matches, "event_id");
-    total += matches.length;
-    console.log(`  ${events.length} events; ${teams.length} teams; ${matches.length} completed matches stored.`);
-    await sleep(350);
+      await upsertInChunks("teams", [...teamsById.values()], "sport,id");
+      await upsertInChunks("matches", matches, "event_id");
+      seasonMatches += matches.length;
+      await sleep(250);
+    }
+    total += seasonMatches;
+    console.log(`  ${seasonEvents} events; ${seasonMatches} completed matches stored.`);
   }
 }
 console.log(`Historical ingestion finished. ${total} completed matches processed (idempotent upsert).`);

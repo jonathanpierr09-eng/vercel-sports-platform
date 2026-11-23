@@ -1,0 +1,31 @@
+name: PRONO historical analysis quality checks
+
+on:
+  push:
+    branches: [prono-v1-preview]
+  pull_request:
+    branches: [prono-v1-preview]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: prono-v1-preview
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Syntax checks
+        run: |
+          node --check api/history.js
+          node --check lib/historical-analysis.js
+      - name: Historical analysis tests
+        run: npm test

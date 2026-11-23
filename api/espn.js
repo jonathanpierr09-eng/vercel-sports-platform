@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     const upstream = await fetch(target.toString(), {headers:{"User-Agent":"PRONO/1.0","Accept":"application/json"}});
     const body = await upstream.text();
     res.setHeader("Content-Type","application/json; charset=utf-8");
-    res.setHeader("Cache-Control","s-maxage=30, stale-while-revalidate=90");
+    res.setHeader("Cache-Control","s-maxage=5, stale-while-revalidate=5");
     return res.status(upstream.status).send(body);
   } catch { return res.status(502).json({error:"ESPN upstream unavailable"}); }
 }

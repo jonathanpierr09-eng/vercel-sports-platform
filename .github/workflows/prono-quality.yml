@@ -29,3 +29,5 @@ jobs:
           node --check lib/historical-analysis.js
       - name: Historical analysis tests
         run: npm test
+      - name: Production build check
+        run: npm run build

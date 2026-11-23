@@ -53,7 +53,7 @@ async function espnJson(path) {
 
 function integerScore(value) {
   if (typeof value === "number" && Number.isInteger(value) && value >= 0) return value;
-  if (typeof value === "string" && /^\\d+$/.test(value.trim())) return Number(value.trim());
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) return Number(value.trim());
   return null;
 }
 

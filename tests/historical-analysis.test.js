@@ -73,5 +73,5 @@ test("head-to-head is symmetric to schedule ordering and respects target date", 
   ];
   const h2h = buildHeadToHead(rows, 1, 2, { before: "2026-03-01T12:00:00Z" });
   assert.deepEqual(h2h.map(row => row.id), ["2", "1"]);
-  assert.equal(h2h[0].result, "L");
+  assert.equal(h2h[0].result, "D");
 });

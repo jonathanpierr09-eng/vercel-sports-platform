@@ -1,21 +1,17 @@
 // Historical ESPN analysis endpoint. Only completed matches before the selected fixture are included.
-import {
-  buildHeadToHead,
-  buildTeamHistory,
-  summarizeMatches
-} from "../lib/historical-analysis.js";
+import { buildHeadToHead, buildTeamHistory, summarizeMatches } from "../lib/historical-analysis.js";
 
 const SPORTS = new Set(["soccer", "basketball", "hockey"]);
 const LEAGUE_RE = /^[a-z0-9._-]{2,40}$/i;
-const TEAM_RE = /^\\d{1,12}$/;
+const TEAM_RE = /^\d{1,12}$/;
 
 async function getSchedule(sport, league, teamId) {
-  const url = new URL(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${teamId}/schedule`);
+  const url = new URL(\`https://site.api.espn.com/apis/site/v2/sports/\${sport}/\${league}/teams/\${teamId}/schedule\`);
   const response = await fetch(url, {
     headers: { "User-Agent": "PRONO/1.2", "Accept": "application/json" },
     signal: AbortSignal.timeout(7500)
   });
-  if (!response.ok) throw new Error(`ESPN HTTP ${response.status}`);
+  if (!response.ok) throw new Error(\`ESPN HTTP \${response.status}\`);
   const data = await response.json();
   if (!Array.isArray(data.events)) throw new Error("Format d’historique ESPN non reconnu");
   return data.events;
@@ -26,7 +22,6 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Méthode non autorisée." });
   }
-
   const { sport, league, home, away, limit = "10", targetDate } = req.query || {};
   if (!SPORTS.has(sport) || !LEAGUE_RE.test(league || "") ||
       !TEAM_RE.test(home || "") || !TEAM_RE.test(away || "") ||
